@@ -5,16 +5,16 @@ import com.qualcomm.robotcore.hardware.HardwareMap;
 
 public class Superstructure {
     public static Vision vision = new Vision();
-
+    // PID DEĞERİNİ BULACAĞIZ ŞASE HAREKETİ İÇİN
     private static final PIDController visionPID = new PIDController(0.02, 0.0, 0.0);
 
-    // Tolerans: ±1.2 derece (Limelight tx gürültüsünü filtrelemek için)
+    // Tolerans: ±2 derece (Limelight tx gürültüsünü filtrelemek için)
     private static final double ALIGNMENT_TOLERANCE_DEG = 2;
 
     // Minimum motor gücü: Şasenin sürtünmesini yenip küçük açılarda takılmasını önler (feedforward/kF )
-    private static final double MIN_TURN_POWER = 0.00;
+    private static final double MIN_TURN_POWER = 0.015;
 
-    // Radar / Sweep Ayarları
+    // SAĞA SOLA TARAMA YAPMAK İÇİN KULLANDIM
     private static final double SWEEP_AMPLITUDE = Math.toRadians(30.0); // ±30 Derece
     private static final double SWEEP_POWER = 0.15;
 
@@ -25,7 +25,7 @@ public class Superstructure {
     public static void init(HardwareMap hardwareMap) {
         vision.init(hardwareMap);
 
-        visionPID.setSetPoint(0.0);
+        visionPID.setSetPoint(0.0); // SET POINT 0 DEMEK TX= 0 A GÖNDERMEK DEMEK PID DEĞER 0 OLANA KADAR ÇALIŞACAK
         visionPID.setTolerance(ALIGNMENT_TOLERANCE_DEG);
     }
 
@@ -43,7 +43,7 @@ public class Superstructure {
 
     public static void reset() {
         vision.reset();
-        visionPID.reset();
+        visionPID.reset(); // PID RESET YAPIYORUZ Kİ HER SEFERİNDE ÇALIŞTIRDIĞIMIZDA ESKİ PID DEĞER HESABI SİLİNSİN YENİDEN HESAPLASIN
         isSweeping = false;
     }
 
@@ -69,6 +69,7 @@ public class Superstructure {
 
             // 2. PID çıktısını hesapla (SetPoint zaten 0.0)
             // tx pozitifse (hedef sağdaysa) robot sağa dönecek şekilde güç üretir
+            // SOLDAKİ TX LIMELIGHTAN GELEN DEĞER , 0 İSE BİZİM İSTEDİĞİMİZ DEĞER TX İ 0 YAPMAK
             double turnPower = visionPID.calculate(vision.tx, 0.0);
 
             // 3. Minimum sürtünme desteği (küçük açılarda robotun donup kalmasını önler)
@@ -78,11 +79,12 @@ public class Superstructure {
                 turnPower -= MIN_TURN_POWER;
             }
 
-            // 4. Güvenli maksimum sınır [-0.55, 0.55]
+            // 4. Güvenli maksimum sınır [-0.35, 0.35]
+            // SEBEBİ ŞU ROBOT YÜKSEK HIZLARI HESAPLASADA ONU SINIRLANDIRIYORUM Kİ ROBOT MEVLANA MOD AÇMASIN HIZLI DÖNÜP YAKALAMAMAZLIK YAPMASIN
             return Math.max(-0.35, Math.min(0.35, turnPower));
         }
 
-        // DURUM 2: Tag Görünmüyor -> ±30° Radar Taraması
+        // DURUM 2: Tag Görünmüyor -> ±30 Taraması
         if (!isSweeping) {
             centerHeading = currentHeading;
             isSweeping = true;
@@ -107,6 +109,7 @@ public class Superstructure {
         return vision.tv && Math.abs(vision.tx) <= ALIGNMENT_TOLERANCE_DEG;
     }
 
+    // BU FONKSİYON İSE ROBOT AÇILARINI NORMALİZE ETMEK İÇİN -180,+180 OLARAK ALGILAMAK İÇİN YAKIN TARAFTAN DÖNEMK İÇİN KULLANIYORUM
     private static double normalizeAngle(double radians) {
         while (radians > Math.PI) radians -= 2 * Math.PI;
         while (radians < -Math.PI) radians += 2 * Math.PI;
