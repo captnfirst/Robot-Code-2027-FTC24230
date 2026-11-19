@@ -1,118 +1,61 @@
 package org.firstinspires.ftc.teamcode.subsystems;
 
-import com.arcrobotics.ftclib.controller.PIDController;
+import com.acmerobotics.dashboard.config.Config;
 import com.qualcomm.robotcore.hardware.HardwareMap;
-
+@Config
 public class Superstructure {
-    public static Vision vision = new Vision();
-    // PID DEĞERİNİ BULACAĞIZ ŞASE HAREKETİ İÇİN
-    private static final PIDController visionPID = new PIDController(0.02, 0.0, 0.0);
+    public static final Flywheel flywheel = new Flywheel();
+    public static final Feeder feeder = new Feeder();
 
-    // Tolerans: ±2 derece (Limelight tx gürültüsünü filtrelemek için)
-    private static final double ALIGNMENT_TOLERANCE_DEG = 2;
-
-    // Minimum motor gücü: Şasenin sürtünmesini yenip küçük açılarda takılmasını önler (feedforward/kF )
-    private static final double MIN_TURN_POWER = 0.015;
-
-    // SAĞA SOLA TARAMA YAPMAK İÇİN KULLANDIM
-    private static final double SWEEP_AMPLITUDE = Math.toRadians(30.0); // ±30 Derece
-    private static final double SWEEP_POWER = 0.15;
-
-    private static boolean isSweeping = false;
-    private static double centerHeading = 0.0;
-    private static int sweepDirection = 1;
+    public static double RPM = 3500.0;
+    private static boolean isShooting = false;
+    public static boolean flywheelIdleMode = true;
+    public static double flywheelIdleRPM = 2800.0;
 
     public static void init(HardwareMap hardwareMap) {
-        vision.init(hardwareMap);
-
-        visionPID.setSetPoint(0.0); // SET POINT 0 DEMEK TX= 0 A GÖNDERMEK DEMEK PID DEĞER 0 OLANA KADAR ÇALIŞACAK
-        visionPID.setTolerance(ALIGNMENT_TOLERANCE_DEG);
+        flywheel.init(hardwareMap);
+        feeder.init(hardwareMap);
     }
 
     public static void periodic() {
-        vision.periodic();
+        if (flywheelIdleMode && !isShooting) {
+            flywheel.setSetpointRPM(flywheelIdleRPM);
+        }
+
+        flywheel.periodic();
+        feeder.periodic();
     }
 
     public static void read() {
-        vision.read();
+        flywheel.read();
+        feeder.read();
     }
 
     public static void write() {
-        vision.write();
+        flywheel.write();
+        feeder.write();
     }
 
     public static void reset() {
-        vision.reset();
-        visionPID.reset(); // PID RESET YAPIYORUZ Kİ HER SEFERİNDE ÇALIŞTIRDIĞIMIZDA ESKİ PID DEĞER HESABI SİLİNSİN YENİDEN HESAPLASIN
-        isSweeping = false;
+        flywheel.reset();
+        feeder.reset();
+        flywheelIdleMode = true;
+        isShooting = false;
     }
 
-    public static void stopSweep() {
-        isSweeping = false;
-    }
-
-    /**
-     * Tag varsa PID ile kilitlenir, yoksa ±30 derece radar taraması yapar.
-     * @param currentHeading Robotun anlık açı değeri (Radyan cinsinden)
-     * @return Motor dönüş gücü
-     */
-    public static double updateTargetLockOrSweep(double currentHeading) {
-        // DURUM 1: Tag Görünüyor -> Kilitlenme Mantığı
-        if (vision.tv) {
-            isSweeping = false;
-
-            // 1. Gerçek tx açısına göre tolerans kontrolü:
-            // Hedef zaten merkezdeyse motoru durdur
-            if (Math.abs(vision.tx) <= ALIGNMENT_TOLERANCE_DEG) {
-                return 0.0;
-            }
-
-            // 2. PID çıktısını hesapla (SetPoint zaten 0.0)
-            // tx pozitifse (hedef sağdaysa) robot sağa dönecek şekilde güç üretir
-            // SOLDAKİ TX LIMELIGHTAN GELEN DEĞER , 0 İSE BİZİM İSTEDİĞİMİZ DEĞER TX İ 0 YAPMAK
-            double turnPower = visionPID.calculate(vision.tx, 0.0);
-
-            // 3. Minimum sürtünme desteği (küçük açılarda robotun donup kalmasını önler)
-            if (turnPower > 0) {
-                turnPower += MIN_TURN_POWER;
-            } else if (turnPower < 0) {
-                turnPower -= MIN_TURN_POWER;
-            }
-
-            // 4. Güvenli maksimum sınır [-0.35, 0.35]
-            // SEBEBİ ŞU ROBOT YÜKSEK HIZLARI HESAPLASADA ONU SINIRLANDIRIYORUM Kİ ROBOT MEVLANA MOD AÇMASIN HIZLI DÖNÜP YAKALAMAMAZLIK YAPMASIN
-            return Math.max(-0.35, Math.min(0.35, turnPower));
+    public static void setShootSystem(){
+        isShooting = true;
+        if(flywheel.IsAtSetpoint()){
+            feeder.setFeederMotor(1.0);
+        }else{
+            feeder.setFeederMotor(0.0);
         }
-
-        // DURUM 2: Tag Görünmüyor -> ±30 Taraması
-        if (!isSweeping) {
-            centerHeading = currentHeading;
-            isSweeping = true;
-            sweepDirection = 1;
-        }
-
-        double headingError = normalizeAngle(currentHeading - centerHeading);
-
-        if (headingError >= SWEEP_AMPLITUDE) {
-            sweepDirection = -1;
-        } else if (headingError <= -SWEEP_AMPLITUDE) {
-            sweepDirection = 1;
-        }
-
-        return SWEEP_POWER * sweepDirection;
+        flywheel.setSetpointRPM(RPM);
     }
 
-    /**
-     * Gerçek tx verisine dayalı kesin hizalanma kontrolü
-     */
-    public static boolean isAligned() {
-        return vision.tv && Math.abs(vision.tx) <= ALIGNMENT_TOLERANCE_DEG;
-    }
-
-    // BU FONKSİYON İSE ROBOT AÇILARINI NORMALİZE ETMEK İÇİN -180,+180 OLARAK ALGILAMAK İÇİN YAKIN TARAFTAN DÖNEMK İÇİN KULLANIYORUM
-    private static double normalizeAngle(double radians) {
-        while (radians > Math.PI) radians -= 2 * Math.PI;
-        while (radians < -Math.PI) radians += 2 * Math.PI;
-        return radians;
+    public static void stopShooting(){
+        isShooting = false;
+        flywheel.setSetpointRPM(0.0);
+        feeder.setFeederMotor(0.0);
     }
 }
