@@ -1,0 +1,22 @@
+// Robot ve simülasyonun ORTAK kullandığı saf Java kodu.
+// Burada FTC SDK / Android sınıfı (HardwareMap, DcMotor, Gamepad ...) KULLANILMAZ,
+// böylece aynı kod hem Control Hub'da hem de bilgisayarda çalışır.
+plugins {
+    id 'java-library'
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    // Pedro'nun çekirdeği saf Java'dır. Sürüm, revhub 3.0.1'in istediği sürümle aynı olmalı.
+    api 'com.pedropathing:core:3.0.1'
+}
+
+// FTC uygulaması Java 8 ile derleniyor; ortak modül de Java 8 bytecode üretmeli.
+tasks.withType(JavaCompile).configureEach {
+    options.release = 8
+    options.encoding = 'UTF-8'
+    options.compilerArgs += ['-Xlint:-options']
+}

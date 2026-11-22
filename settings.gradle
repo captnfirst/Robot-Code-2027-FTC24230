@@ -11,3 +11,5 @@ plugins {
 
 include ':FtcRobotController'
 include ':TeamCode'
+include ':shared'
+include ':sim'

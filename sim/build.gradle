@@ -1,0 +1,33 @@
+// Bilgisayarda çalışan simülatör. Robota YÜKLENMEZ.
+// Çalıştırmak için (Android Studio terminali):
+//   Windows : gradlew.bat :sim:run
+//   Mac/Linux: ./gradlew :sim:run
+// Gamepad olmadan otonomu izlemek için:  gradlew.bat :sim:run --args="--auto"
+plugins {
+    id 'java'
+    id 'application'
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation project(':shared')
+    // Bilgisayara takılı Xbox / PlayStation kumandasını okumak için (Windows, Mac, Linux)
+    implementation 'com.badlogicgames.jamepad:jamepad:2.30.0.0'
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.release = 17
+    options.encoding = 'UTF-8'
+}
+
+application {
+    mainClass = 'org.firstinspires.ftc.teamcode.sim.SimMain'
+}
+
+tasks.named('run') {
+    standardInput = System.in
+    workingDir = projectDir
+}
